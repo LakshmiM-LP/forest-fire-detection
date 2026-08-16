@@ -1,4 +1,4 @@
-# Python virtual environment
+ # Python virtual environment
 .venv/
 
 # Python cache
@@ -16,17 +16,15 @@ __pycache__/
 # IDE
 .vscode/
 
-# Model files
-*.pt
-*.pth
-*.onnx
-
 # Large datasets
 data/raw/
 data/processed/
 data/dataset/
 
-# Training outputs
+# Uploaded videos
+data/videos/
+
+# Generated outputs
 runs/
 outputs/
 
@@ -36,3 +34,10 @@ outputs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Temporary media
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wav
