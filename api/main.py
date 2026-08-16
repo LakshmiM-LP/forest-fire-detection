@@ -31,13 +31,21 @@ app.add_middleware(
 
 
 # ==========================================
-# Load trained YOLO model
+# Shared detection settings
+# (kept identical to src/inference/video_temporal.py
+# so image and video results don't silently disagree)
 # ==========================================
 
 MODEL_PATH = "models/fire_smoke_yolo11n_best.pt"
+CONFIDENCE_THRESHOLD = 0.50
+TARGET_CLASSES = ["fire", "smoke"]
+
+
+# ==========================================
+# Load trained YOLO model
+# ==========================================
 
 model = YOLO(MODEL_PATH)
-
 print("Fire & Smoke YOLO model loaded successfully!")
 
 
@@ -47,17 +55,12 @@ print("Fire & Smoke YOLO model loaded successfully!")
 
 @app.get("/")
 def home():
-    return {
-        "message": "Forest Fire & Smoke Detection API is running"
-    }
+    return {"message": "Forest Fire & Smoke Detection API is running"}
 
 
 @app.get("/health")
 def health():
-    return {
-        "status": "healthy",
-        "model": "loaded"
-    }
+    return {"status": "healthy", "model": "loaded"}
 
 
 # ==========================================
@@ -67,13 +70,8 @@ def health():
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
 
-    # Read uploaded file
     contents = await file.read()
-
-    # Convert bytes to numpy array
     image_array = np.frombuffer(contents, np.uint8)
-
-    # Convert numpy array to OpenCV image
     image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
 
     if image is None:
@@ -82,11 +80,10 @@ async def predict(file: UploadFile = File(...)):
             "message": "Invalid image file"
         }
 
-    # Run YOLO detection
     results = model.predict(
         source=image,
         imgsz=640,
-        conf=0.25,
+        conf=CONFIDENCE_THRESHOLD,
         verbose=False
     )
 
@@ -94,19 +91,23 @@ async def predict(file: UploadFile = File(...)):
 
     for result in results:
 
+        if result.boxes is None:
+            continue
+
         for box in result.boxes:
 
             class_id = int(box.cls[0])
             confidence = float(box.conf[0])
-
             class_name = model.names[class_id]
+
+            if class_name.lower() not in TARGET_CLASSES:
+                continue
 
             detections.append({
                 "class": class_name,
                 "confidence": round(confidence, 3)
             })
 
-    # Check whether fire/smoke detected
     detected = len(detections) > 0
 
     return {

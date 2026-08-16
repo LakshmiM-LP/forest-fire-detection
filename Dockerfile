@@ -9,21 +9,24 @@ RUN apt-get update && \
 
 # Install Python dependencies
 COPY requirements.txt .
-
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
+# NOTE: data/ is gitignored (raw datasets, uploaded videos) and is
+# intentionally NOT copied here -- the container creates its own
+# empty data/videos dir at runtime for uploads instead.
 COPY api ./api
 COPY dashboard ./dashboard
 COPY src ./src
 COPY models ./models
-COPY data ./data
+COPY start.sh ./start.sh
 
-# Create output directory
-RUN mkdir -p runs
+# Output / upload directories created at build time so the app
+# doesn't need to create them on first request
+RUN mkdir -p runs data/videos && chmod +x start.sh
 
-# Streamlit port
-EXPOSE 8501
+# FastAPI + Streamlit ports
+EXPOSE 8000 8501
 
-# Start Streamlit
-CMD ["streamlit", "run", "dashboard/app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+# Start both the API and the dashboard
+CMD ["./start.sh"]
