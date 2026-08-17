@@ -185,6 +185,31 @@ detection_history = deque(maxlen=history_maxlen)
 
 
 # ============================================================
+# DOWNSCALE FOR PROCESSING
+# ============================================================
+# YOLO resizes every frame down to imgsz=640 internally anyway, so
+# feeding it a full 4K frame wastes memory and CPU without adding
+# detection accuracy. Downscaling once here (decode -> inference ->
+# drawing -> writing) cuts memory use at every stage of the loop,
+# not just the final FFmpeg export -- important on machines with
+# limited RAM.
+
+MAX_PROCESS_HEIGHT = 1080
+
+orig_width, orig_height = width, height
+
+if height > MAX_PROCESS_HEIGHT:
+    scale = MAX_PROCESS_HEIGHT / height
+    width = int(round(orig_width * scale / 2) * 2)   # keep even (codec requirement)
+    height = MAX_PROCESS_HEIGHT
+    print(f"Downscaling frames: {orig_width}x{orig_height} -> {width}x{height}")
+else:
+    print(f"No downscaling needed: {orig_width}x{orig_height}")
+
+print()
+
+
+# ============================================================
 # VIDEO WRITER
 # ============================================================
 
@@ -231,6 +256,9 @@ while True:
     ret, frame = cap.read()
     if not ret:
         break
+
+    if (orig_width, orig_height) != (width, height):
+        frame = cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
 
     frame_number += 1
     current_time = frame_number / fps
@@ -632,6 +660,10 @@ if os.path.exists(OUTPUT_VIDEO):
     except Exception:
         pass
 
+# Frames were already downscaled (MAX_PROCESS_HEIGHT) before being
+# written to TEMP_VIDEO, so no scale filter is needed here -- this
+# step is now just a codec conversion (mp4v -> h264/aac), which is
+# far lighter than encoding a full 4K stream.
 ffmpeg_command = [
     "ffmpeg", "-y",
     "-i", TEMP_VIDEO,
@@ -639,8 +671,8 @@ ffmpeg_command = [
     "-map", "0:v:0",
     "-map", "1:a:0",
     "-c:v", "libx264",
-    "-preset", "fast",
-    "-crf", "23",
+    "-preset", "veryfast",
+    "-crf", "25",
     "-pix_fmt", "yuv420p",
     "-c:a", "aac",
     "-b:a", "128k",
@@ -653,8 +685,20 @@ result = subprocess.run(ffmpeg_command, capture_output=True, text=True)
 
 if result.returncode != 0:
     print()
-    print("FFmpeg failed.")
-    print(result.stderr)
+    print("=" * 65)
+    print("FFMPEG FAILED (see stderr below)")
+    print("=" * 65)
+    print(result.stderr[-3000:])  # tail, in case it's long
+    print("=" * 65)
+    sys.exit(1)
+
+# Sanity-check the output is actually a complete, playable file
+# before trusting it -- catches silent truncation/OOM kills that
+# ffmpeg's own return code sometimes doesn't flag clearly.
+if not os.path.exists(OUTPUT_VIDEO) or os.path.getsize(OUTPUT_VIDEO) < 1024:
+    print()
+    print("FFmpeg exited 0 but the output file looks wrong (missing or tiny).")
+    print("Check container memory limits -- this usually means it was killed mid-encode.")
     sys.exit(1)
 
 if os.path.exists(TEMP_VIDEO):
