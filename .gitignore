@@ -40,4 +40,7 @@ Thumbs.db
 *.avi
 *.mov
 *.mkv
-*.wav
+*.wavfrontend/node_modules/
+frontend/dist/
+frontend/node_modules/
+frontend/dist/
