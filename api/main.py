@@ -1,6 +1,8 @@
 import asyncio
 import base64
+import re
 import subprocess
+import sys
 import time
 import uuid
 from pathlib import Path
@@ -43,6 +45,18 @@ app.add_middleware(
 MODEL_PATH = "models/fire_smoke_yolo11n_best.pt"
 CONFIDENCE_THRESHOLD = 0.50
 TARGET_CLASSES = ["fire", "smoke"]
+
+# Live webcam feeds have far noisier, more variable lighting than
+# curated image/video test data (warm indoor light, sunlit walls,
+# skin tones, patterned fabric) -- these can visually resemble fire
+# to the model in ways your dataset's images mostly don't. Using a
+# stricter threshold here (not for /predict or the video pipeline,
+# which stay at CONFIDENCE_THRESHOLD to match your reported eval
+# metrics) trades a little live sensitivity for fewer false alarms.
+# The real fix is adding more non-fire "hard negative" training
+# images (sunlit rooms, warm fabric, skin tones) and retraining --
+# this is a mitigation, not a replacement for that.
+LIVE_CONFIDENCE_THRESHOLD = 0.65
 
 VIDEO_UPLOAD_DIR = Path("data/videos")
 RUNS_DIR = Path("runs")
@@ -127,6 +141,15 @@ async def predict(file: UploadFile = File(...)):
 
 video_jobs = {}  # job_id -> {"status", "process", "input_path", "output_path", "error"}
 
+# Matches the per-event line video_temporal.py prints when an event
+# is confirmed, e.g. "FIRE/SMOKE EVENT #1 CONFIRMED"
+_EVENT_LINE_RE = re.compile(r"FIRE/SMOKE EVENT #\d+ CONFIRMED")
+
+# Matches the final summary line it prints at the end, e.g.
+# "Confirmed fire/smoke events: 1" -- used as a fallback in case the
+# per-line count above ever misses.
+_SUMMARY_LINE_RE = re.compile(r"Confirmed fire/smoke events:\s*(\d+)")
+
 
 def _run_video_job(job_id: str, input_path: Path):
 
@@ -135,7 +158,15 @@ def _run_video_job(job_id: str, input_path: Path):
         output_path.unlink()
 
     process = subprocess.Popen(
-        ["python", "src/inference/video_temporal.py", str(input_path)],
+        # sys.executable, not the bare string "python" -- this
+        # guarantees the subprocess uses the *exact same interpreter*
+        # currently running this FastAPI server (venv, conda env,
+        # whatever it is), instead of resolving "python" through
+        # PATH and possibly landing on a different, unrelated
+        # Python install that doesn't have your dependencies
+        # (this is what caused "ModuleNotFoundError: No module
+        # named 'cv2'" even though cv2 was installed in the venv).
+        [sys.executable, "src/inference/video_temporal.py", str(input_path)],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -145,11 +176,29 @@ def _run_video_job(job_id: str, input_path: Path):
     video_jobs[job_id]["status"] = "processing"
 
     log_lines = []
+    event_count = 0
+    summary_count = None
+
     for line in process.stdout:
         log_lines.append(line.rstrip())
-        video_jobs[job_id]["log"] = log_lines[-30:]  # keep it bounded
+
+        if _EVENT_LINE_RE.search(line):
+            event_count += 1
+
+        summary_match = _SUMMARY_LINE_RE.search(line)
+        if summary_match:
+            summary_count = int(summary_match.group(1))
+
+        video_jobs[job_id]["log"] = log_lines[-30:]  # keep display bounded
+        video_jobs[job_id]["event_count"] = event_count
 
     process.wait()
+
+    final_count = event_count
+    if event_count == 0 and summary_count:
+        final_count = summary_count
+
+    video_jobs[job_id]["event_count"] = final_count
 
     if process.returncode == 0 and output_path.exists() and output_path.stat().st_size > 1024:
         video_jobs[job_id]["status"] = "done"
@@ -175,6 +224,7 @@ async def upload_video(file: UploadFile = File(...)):
         "output_path": None,
         "error": None,
         "log": [],
+        "event_count": 0,
     }
 
     loop = asyncio.get_event_loop()
@@ -195,6 +245,7 @@ async def video_status(job_id: str):
         "status": job["status"],
         "log": job.get("log", []),
         "error": job.get("error"),
+        "event_count": job.get("event_count", 0),
     }
 
 
@@ -233,7 +284,7 @@ async def live_detection(websocket: WebSocket):
     detector = TemporalFireDetector(
         model=model,
         target_classes=TARGET_CLASSES,
-        confidence_threshold=CONFIDENCE_THRESHOLD,
+        confidence_threshold=LIVE_CONFIDENCE_THRESHOLD,
         assumed_fps=4.0,  # browser sends a few frames/sec, not full video fps
     )
 

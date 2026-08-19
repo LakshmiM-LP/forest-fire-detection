@@ -6,6 +6,7 @@ export default function VideoPanel({ onStatusChange }) {
   const [jobId, setJobId] = useState(null);
   const [status, setStatus] = useState(null); // queued | processing | done | error
   const [log, setLog] = useState([]);
+  const [eventCount, setEventCount] = useState(0);
   const [error, setError] = useState(null);
   const pollRef = useRef(null);
 
@@ -15,6 +16,7 @@ export default function VideoPanel({ onStatusChange }) {
     setJobId(null);
     setStatus(null);
     setLog([]);
+    setEventCount(0);
     setError(null);
     onStatusChange({ state: "idle", label: "Video loaded — ready to process" });
   }
@@ -55,13 +57,16 @@ export default function VideoPanel({ onStatusChange }) {
         const data = await res.json();
         setStatus(data.status);
         setLog(data.log || []);
+        setEventCount(data.event_count || 0);
 
         if (data.status === "done") {
           clearInterval(pollRef.current);
-          const hasAlert = data.log.some((l) => l.includes("CONFIRMED"));
+          const hasAlert = (data.event_count || 0) > 0;
           onStatusChange({
             state: hasAlert ? "alert" : "idle",
-            label: hasAlert ? "Fire/smoke events found in video" : "No events detected",
+            label: hasAlert
+              ? `${data.event_count} fire/smoke event(s) found in video`
+              : "No events detected",
           });
         }
 
@@ -137,6 +142,13 @@ export default function VideoPanel({ onStatusChange }) {
             }
           >
             {status ? status.toUpperCase() : "—"}
+          </span>
+        </div>
+
+        <div className="telemetry-row">
+          <span className="telemetry-label">Confirmed events</span>
+          <span className={"telemetry-value " + (eventCount > 0 ? "ember" : "sage")}>
+            {eventCount}
           </span>
         </div>
 
