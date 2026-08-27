@@ -238,7 +238,7 @@ Created the alarm audio
 Generated a browser-compatible H.264 output video
 
 
-Temporal Verification Demo
+## Temporal Verification Demo
 
 The React dashboard displays the confirmed fire event and its current temporal state:
 
@@ -249,6 +249,7 @@ FastAPI Backend
 The project includes a FastAPI backend for serving the machine learning inference functionality.
 
 Backend
+
 http://localhost:8000
 
 The API provides image-based fire and smoke detection and returns detection results including the detected class and confidence.
@@ -275,9 +276,8 @@ A React-based web dashboard provides the user interface for interacting with the
 
 The React frontend is served through Nginx in the Docker deployment.
 
-```text
 http://localhost:5173
-```
+
 
 
 ## Docker Deployment
