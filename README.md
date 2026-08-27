@@ -15,7 +15,7 @@ The system combines:
 - Persistence-based event detection
 - Audio alerts
 - FastAPI inference backend
-- Streamlit web dashboard
+- React web dashboard
 - Docker-based deployment
 - Quantitative model evaluation using Precision, Recall, F1-score and mAP
 
@@ -32,7 +32,7 @@ The system is designed to:
 - Detect persistent fire events across multiple video frames
 - Generate audio alerts based on event persistence
 - Provide inference through a FastAPI backend
-- Provide a user-friendly interface through Streamlit
+- Provide a user-friendly interface through React
 - Package the complete application using Docker
 
 ---
@@ -43,7 +43,7 @@ The system is designed to:
                 Image / Video Input
                        │
                        ▼
-              Streamlit Dashboard
+                  React Dashboard
                        │
           ┌────────────┴────────────┐
           │                         │
@@ -239,7 +239,7 @@ Generated a browser-compatible H.264 output video
 
 Temporal Verification Demo
 
-The Streamlit dashboard successfully displays the confirmed fire event and its current temporal state:
+The React dashboard displays the confirmed fire event and its current temporal state:
 
 ![Temporal Verification Result](screenshots/temporal-verification-result.png)
 
@@ -253,74 +253,102 @@ http://localhost:8000
 The API provides image-based fire and smoke detection and returns detection results including the detected class and confidence.
 
 
-Streamlit Dashboard
+## React Dashboard
 
-A Streamlit dashboard provides the user interface for interacting with the system.
+A React-based web dashboard provides the user interface for interacting with the fire and smoke detection system.
 
-Features
-Image upload
-Image fire/smoke detection
-Detection confidence display
-Video upload
-Temporal verification
-Processed video playback
-Audio alert generation
-Dashboard
+### Features
 
-http://localhost:8501
+- Image upload and fire/smoke detection
+- Detection confidence display
+- Video upload
+- Temporal verification
+- Fire-event confirmation
+- Processing status monitoring
+- Confirmed event count
+- Processed video playback
+- Audio alert generation
+- Result video download
+
+### Frontend
+
+The React frontend is served through Nginx in the Docker deployment.
+
+```text
+http://localhost:5173
+```
 
 
+## Docker Deployment
 
-Docker Deployment
+The application is containerized using Docker and Docker Compose.
 
-The complete application is containerized using Docker.
+The deployment consists of two services:
 
-The Docker container runs both:
+- FastAPI backend
+- React frontend served through Nginx
 
-FastAPI backend on port 8000
-Streamlit dashboard on port 8501
+### Services
 
-Build Docker Image
+| Service | Technology | Port |
 
-docker build -t forest-fire .
+| Backend | FastAPI + Python | 8000 |
+| Frontend | React + Nginx | 5173 |
 
-Run Docker Container
+### Build and Start
 
-docker run --name forest-fire-app -p 8000:8000 -p 8501:8501 forest-fire
-
+```bash
+docker compose up --build
+```
 
 Access the Application
 
-Streamlit dashboard:
-http://localhost:8501
+React frontend:
+```text
+http://localhost:5173
+```
 
 FastAPI backend:
+```text
 http://localhost:8000
+```
 
 
-Technology Stack
-
-Python
-PyTorch
-YOLO11n
-Ultralytics
-OpenCV
-FastAPI
-Streamlit
-FFmpeg
-Docker
-Git / GitHub
+Stop the Application
+```bash
+docker compose down
+```
 
 
-Project Structure
+## Technology Stack
+
+- Python
+- PyTorch
+- YOLO11n
+- Ultralytics
+- OpenCV
+- FastAPI
+- React
+- Nginx
+- FFmpeg
+- Docker
+- Docker Compose
+- Git / GitHub
+
+
+## Project Structure
 
 forest-fire-detection/
 │
 ├── api/
 │   └── main.py
 │
-├── dashboard/
-│   └── app.py
+├── frontend/
+│   ├── src/
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── package.json
+│   └── vite.config.js
 │
 ├── models/
 │   └── fire_smoke_yolo11n_best.pt
@@ -328,16 +356,20 @@ forest-fire-detection/
 ├── src/
 │   └── inference/
 │       ├── predict.py
+│       ├── temporal_detector.py
 │       └── video_temporal.py
 │
 ├── data/
-│   └── dataset/              # Local dataset, not included in Git
+│   └── videos/
+│
+├── screenshots/
 │
 ├── notebooks/
 │
 ├── tests/
 │
 ├── Dockerfile
+├── docker-compose.yml
 ├── start.sh
 ├── requirements.txt
 ├── .dockerignore
@@ -357,7 +389,9 @@ Project Status
  4K to 1080p preprocessing
  H.264 browser-compatible output
  FastAPI backend
- Streamlit dashboard
+ React dashboard 
+ Docker Compose deployment
+ Nginx frontend serving
  Docker containerization
  End-to-end Docker testing
  Test-set model evaluation
@@ -366,6 +400,7 @@ Project Status
  F1-score evaluation
  mAP evaluation
  GitHub version control
+
 
 
 Limitations
