@@ -242,7 +242,7 @@ Temporal Verification Demo
 
 The React dashboard displays the confirmed fire event and its current temporal state:
 
-![Temporal Verification Result](screenshots/temporal-verification-result.png)
+![Temporal Verification Result](./screenshots/temporal-verification-result.png)
 
 FastAPI Backend
 
