@@ -39,6 +39,7 @@ The system is designed to:
 
 ##  System Architecture
 
+![System Architecture](screenshots/system-architecture.png)
 ```text
                 Image / Video Input
                        │
